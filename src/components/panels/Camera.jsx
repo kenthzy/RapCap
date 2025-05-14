@@ -215,40 +215,6 @@ export default class Camera extends React.Component {
 		});
 	};
 
-	startContinuousShooting = async () => {
-		const { countdown } = this.state;
-		
-		// Don't start if not in 5-second mode or already shooting
-		if (countdown !== 5 || this.state.currentCountdown > 0) return;
-
-		const shootCycle = async () => {
-		// Check if still in 5-second mode
-		if (this.state.countdown !== 5) {
-			this.setState({ currentCountdown: 0 });
-			return;
-		}
-
-		// Countdown sequence
-		for (let i = 5; i > 0; i--) {
-			if (this.state.countdown !== 5) break;
-			this.setState({ currentCountdown: i });
-			await new Promise(resolve => setTimeout(resolve, 1000));
-		}
-
-		// Capture only if still in 5-second mode
-		if (this.state.countdown === 5) {
-			this.shoot();
-			this.setState({ currentCountdown: 0 }, () => {
-			// Start next cycle immediately
-			shootCycle();
-			});
-		}
-		};
-
-		// Start the first cycle
-		shootCycle();
-	};
-
 	render() {
 		return (
 			<>
@@ -279,30 +245,35 @@ export default class Camera extends React.Component {
 								type='primary'
 								icon={<CameraOutlined />}
 								disabled={
-									(this.state.currentCountdown > 0) || 
-									!this.state.frames.find((frame) => !frame.buffer)
+									(this.state.currentCountdown > 0) || !this.state.frames.find((frame) => !frame.buffer)
 								}
-								onClick={() => {
-									if (this.state.countdown === 5) {
-									this.startContinuousShooting();
-									} else {
-									// Original single-shot logic
-									this.setState({ currentCountdown: this.state.countdown });
-									const countdownInterval = setInterval(() => {
-										this.setState(prev => {
-										if (prev.currentCountdown <= 1) {
-											clearInterval(countdownInterval);
-											this.shoot();
-											return { currentCountdown: 0 };
-										}
-										return { currentCountdown: prev.currentCountdown - 1 };
-										});
-									}, 1000);
+								onClick={async () => {
+									const countdownValue = this.state.countdown;
+
+									if (countdownValue === 0) {
+										this.shoot();
+										return;
 									}
+
+									while (true) {
+										this.setState({ currentCountdown: countdownValue });
+
+										for (let i = countdownValue; i > 0; i--) {
+											this.setState({ currentCountdown: i });
+											await new Promise((resolve) => setTimeout(resolve, 1000));
+										}
+
+										this.shoot();
+
+										const hasNextFrame = globals.options.frames.some((frame) => !frame.buffer);
+										if (!hasNextFrame) break;
+									}
+
+									this.setState({ currentCountdown: 0 });
 								}}
-								>
+							>
 								Shoot
-								</Button>
+							</Button>
 						</Col>
 
 						<Col span={1} />
